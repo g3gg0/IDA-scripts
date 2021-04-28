@@ -2,6 +2,7 @@
 IDA script for STM32F1xx family microcontrollers.
 
 Written by Artamonov Dmitry <screwer@gmail.com>
+Updated by g3gg0.de <g3gg0.de@gmail.com>
 
 This program is free software. It comes without any warranty, to the extent permitted by applicable law.
 You can redistribute it and/or modify it under the terms of the WTFPL, Version 2, as published by Sam Hocevar.
@@ -419,7 +420,7 @@ REGS_USB_OTG_FS = {
                 # 'DIEPTSIZx':0x930, 0x950 ... 0xAF0
                 # DOEPCTLx':0xB20, 0xB40 ... 0xCC0, 0xCE0, 0xCFD
                 #        
-for n in xrange(0,7 + 1):
+for n in range(0,7 + 1):
     REGS_USB_OTG_FS[  'HCCHAR{}'.format(n)] = 0x500 + (0x20 * n)
     REGS_USB_OTG_FS[   'HCINT{}'.format(n)] = 0x508 + (0x20 * n)
     REGS_USB_OTG_FS['HCINTMSK{}'.format(n)] = 0x50C + (0x20 * n)
@@ -490,7 +491,7 @@ REGS_PWR    = { 'CR':       0x00,   'CSR':      0x04 }
 
 REGS_BKP    = {                                                             'RTCCR':    0x2C,
                 'CR':       0x30,   'CSR':      0x34 }
-for n in xrange(1, 42 + 1):
+for n in range(1, 42 + 1):
     REGS_BKP['DR{}'.format(n)] = (n * 4) if (n < 11) else ((n-11)*4 + 0x40)
 
 REGS_DESIG  = { 'FLASH_SIZE':   0x7e0,
@@ -544,13 +545,14 @@ def idaSetOpAddrName(ea, n, Name):
 
 def CreateEnum(Regs, BaseAddr, EnumName):
 
-    idc.DelEnum(idc.GetEnum(EnumName))
+    idc.del_enum(idc.get_enum(EnumName))
 
-    EnumId = idc.add_enum(0, EnumName, idaapi.hexflag())
+    EnumId = idc.add_enum(0, EnumName, idaapi.hex_flag())
 
-    for Reg, Descr in Regs.iteritems():
+    for Reg, Descr in Regs.items():
         Comment = None
-        if isinstance(Descr, (int, long)):
+        
+        if isinstance(Descr, (int)):
             Offset = Descr
         else:
             Offset = Descr[0]
@@ -558,11 +560,20 @@ def CreateEnum(Regs, BaseAddr, EnumName):
         
         EnumMemberName = EnumName + '_' + Reg
         idc.add_enum_member(EnumId, EnumMemberName, BaseAddr + Offset, -1)
+        idc.set_name(BaseAddr + Offset, "SFR_" + EnumMemberName, SN_CHECK)
+        ida_bytes.create_data(BaseAddr + Offset, FF_DWORD, 4, ida_idaapi.BADADDR)
+        
+        # add bit banding range for SFRs
+        for bitnum in range(0, 32):
+            BitBandAddress = 0x42000000 + ((BaseAddr + Offset)-0x40000000) * 0x20 + bitnum * 4
+            idc.set_name(BitBandAddress, "SFR_" + EnumMemberName + "_BIT" + str(bitnum), SN_CHECK)
+            ida_bytes.create_data(BitBandAddress, FF_DWORD, 4, ida_idaapi.BADADDR)
+        
         if Comment:
             ConstId = idc.get_enum_member_by_name(EnumMemberName)
             idc.set_enum_member_cmt(ConstId, Comment, True)
 
-    #MaxBit = max(Regs.iteritems(), key=operator.itemgetter(1))[1]
+    #MaxBit = max(Regs.items(), key=operator.itemgetter(1))[1]
     #MaskBit = RoundUpPow2(MaxBit) - 1
     #idc.set_enum_bf(id, 1)
 
@@ -592,7 +603,7 @@ def CreateEnums():
         'STIR':     STIR_BASE,        
         'DBGMCU':   DBGMCU_BASE,
         'DESIG':    INFO_BASE,        
-
+  
         'RCC':      RCC_BASE,
         'RTC':      RTC_BASE,
         'PWR':      POWER_CONTROL_BASE,
@@ -605,26 +616,26 @@ def CreateEnums():
         'SDIO':     SDIO_BASE,
         'EXTI':     EXTI_BASE,
         'DESIG':    INFO_BASE,
-
+  
         'TIM':    [ (TIM1_BASE, 'TIM1'), (TIM2_BASE, 'TIM2'), (TIM3_BASE, 'TIM3'), (TIM4_BASE, 'TIM4'),
                     (TIM5_BASE, 'TIM5'), (TIM6_BASE, 'TIM6'), (TIM7_BASE, 'TIM7'), (TIM8_BASE, 'TIM8'),
                     (TIM9_BASE, 'TIM9'), (TIM10_BASE, 'TIM10'), (TIM11_BASE, 'TIM11'), (TIM12_BASE, 'TIM12'),
                     (TIM13_BASE, 'TIM13'), (TIM14_BASE, 'TIM14'), (TIM15_BASE, 'TIM15'), (TIM16_BASE, 'TIM16'),
                     (TIM17_BASE, 'TIM17') ],
-
+  
         'GPIO':   [ (GPIO_PORT_A_BASE, 'GPIO_A'), (GPIO_PORT_B_BASE, 'GPIO_B'),
                     (GPIO_PORT_C_BASE, 'GPIO_C'), (GPIO_PORT_D_BASE, 'GPIO_D'),
                     (GPIO_PORT_E_BASE, 'GPIO_E'), (GPIO_PORT_F_BASE, 'GPIO_F'),
                     (GPIO_PORT_G_BASE, 'GPIO_G') ],
-
+  
         'ADC':    [ (ADC1_BASE, 'ADC1'), (ADC2_BASE, 'ADC2'), (ADC3_BASE, 'ADC3') ],
         'SPI':    [ (SPI1_BASE, 'SPI1'), (SPI2_BASE, 'SPI2'), (SPI3_BASE, 'SPI3') ],
         'I2C':    [ (I2C1_BASE, 'I2C1'), (I2C2_BASE, 'I2C2') ],
         'DMA':    [ (DMA1_BASE, 'DMA1'), (DMA2_BASE, 'DMA2') ],
-
+  
         'USART':  [ (USART1_BASE, 'USART1'), (USART2_BASE, 'USART2'), (USART3_BASE, 'USART3'), (UART4_BASE, 'UART4'), (UART5_BASE, 'UART5') ],
         'CAN':    [ (BX_CAN1_BASE, 'CAN1'), (BX_CAN2_BASE, 'CAN2') ],
-
+  
 #        'ETH':      ETHERNET_BASE,
 #        'USB_OTG_FS': USB_OTG_FS_BASE,
 # USB_DEV_FS_BASE
@@ -634,13 +645,9 @@ def CreateEnums():
     }
 
 
-    for RegsName, Descr in Enums.iteritems():
+    for RegsName, Descr in Enums.items():
 
-        print(RegsName)
-        print(Descr)
-        print(type(Descr))
-
-        if isinstance(Descr, (int, long)):
+        if not isinstance(Descr, (list)):
             CreateEnumByName(RegsName, Descr)
         else:
             for Item in Descr:
@@ -749,7 +756,7 @@ def CreateVecTable(TableSize=None):
         NameTrap = 'Trap_' + Name
 
         #idc.del_items(ea, 0, 4) # Undef before conversion
-        idaapi.do_unknown_range(ea, 4, 0)
+        idaapi.del_items(ea, 4, 0)
         idc.create_dword(ea)
         idc.set_name(ea, NameVec)
         if Comment:
@@ -792,20 +799,20 @@ def CreateSegmentSRAM():
     SRAM_SIZE = Features.SRamSize
     SRAM_NAME = 'SRAM'
 
-    startEA = SRAM_BASE
-    endEA = SRAM_BASE + SRAM_SIZE - 1
+    start_ea = SRAM_BASE
+    end_ea = SRAM_BASE + SRAM_SIZE - 1
 
-    seg = ida_segment.getseg(startEA)
+    seg = ida_segment.getseg(start_ea)
     Name = ida_segment.get_segm_name(seg) if seg else None
-    if Name == SRAM_NAME and startEA == seg.startEA and endEA == seg.endEA:
+    if Name == SRAM_NAME and start_ea == seg.start_ea and end_ea == seg.end_ea:
         #
         # SRAM already exist
         #
         pass
     else:
         seg = idaapi.segment_t()
-        seg.startEA = startEA
-        seg.endEA = endEA
+        seg.start_ea = start_ea
+        seg.end_ea = end_ea
         seg.bitness = 1 # 32-bit
         idaapi.add_segm_ex(seg, SRAM_NAME, 'CODE', 0)
 
